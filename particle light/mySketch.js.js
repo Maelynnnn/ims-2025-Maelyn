@@ -24,7 +24,7 @@ const MAX_PARTICLE_COUNT = 70;
 const MAX_TRAIL_COUNT = 30;
 
 //setting up
-var colorScheme = ["#E69F66", "#DF843A", "#D8690F", "#B1560D", "#8A430A"];
+var colorScheme = ["#F94144", "#32CD32", "#228B22", "#ADFF2F", "#9ACD32"];
 var shaded = true;
 //call shader function
 var theShader;
@@ -167,7 +167,7 @@ function serializeSketch() {
 			particles[i].mass * particles[i].vel.mag() / 100)
 
 		let itsColor = colorScheme[particles[i].colorIndex];
-		data.colors.push(red(itsColor), green(itsColor), blue(itsColor));
+		data.colors.push(green(itsColor), blue(itsColor), red(itsColor));
 	}
 	
 	return data;
