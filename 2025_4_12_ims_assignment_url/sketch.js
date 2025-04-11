@@ -1,9 +1,8 @@
 let video;
 let handPose;
 let hands = [];
-let params = {};  // 用于存储 URL 参数
-
-let fsButton;  // 全屏按钮
+let params = {}; 
+let fsButton; 
 
 function preload(){
   handPose = ml5.handPose();
