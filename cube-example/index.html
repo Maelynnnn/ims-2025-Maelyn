@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Cube Structure with Stars</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <script>
+    // Firebase 初始化
+    const firebaseConfig = {
+      apiKey: "AIzaSyCceRTMXc7k1SyHZQVdzZZkQRPNqThdEDY",
+      authDomain: "nooneisalonglyplanet.firebaseapp.com",
+      projectId: "nooneisalonglyplanet",
+      storageBucket: "nooneisalonglyplanet.firebasestorage.app",
+      messagingSenderId: "918785077805",
+      appId: "1:918785077805:web:75f16f19b6523838b67ea4",
+      measurementId: "G-72W644TLDX"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+
+    // 匿名登录并加载已有 cubes
+    auth.signInAnonymously().catch(console.error);
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        window.currentUid = user.uid;
+        loadAllCubes();
+      }
+    });
+  </script>
+
+  <style>
+    /* 悬停提示标签 */
+    #cubeLabel {
+      display: none;
+      position: absolute;
+      color: #fff;
+      background: rgba(0,0,0,0.7);
+      padding: 4px 8px;
+      border-radius: 4px;
+      pointer-events: none;
+      z-index: 1500;
+      box-shadow: 0 0 10px rgba(255,255,255,0.8);
+    }
+    /* 遮罩层 */
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 1000;
+    }
+    /* 中央模态框 */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 0 20px rgba(255,255,255,0.8);
+      z-index: 1500;
+    }
+    #messageBox { cursor: pointer; }
+    #profileCard { background: rgba(0,0,0,0.8); max-width: 300px; color: #fff; }
+    #uploadModal { background: #fff; }
+  </style>
+</head>
+
+<body>
+  <button id="plus">+</button>
+  <!-- <input  id="searchInput"
+          placeholder="Search phrase"
+          style="margin-left:10px;" />
+  <button id="searchBtn">Search</button> -->
+
+  <div id="cubeLabel"></div>
+  <div id="overlay"></div>
+
+  <!-- 提示框 -->
+  <div id="messageBox" class="modal">
+    choose a cube to connect 
+  </div>
+
+  <!-- 资料卡 -->
+  <div id="profileCard" class="modal">
+    <p id="profileName"
+       style="font-weight:bold; color:#ffe680;"></p>
+    <p id="profilePhrase"
+       style="font-weight:bold; color:#fff;"></p>
+    <p id="profileKeywords"
+       style="font-style:italic; color:#ccc; display:none;"></p>
+    <p id="profileDesc"
+       style="color:#ddd; display:none;"></p>
+    <div style="margin-top:10px; display:flex; gap:20px;">
+      <button id="connectBtn">Connect To</button>
+      <button id="deleteBtn" style="display:none;">Delete Cube</button>
+    </div>
+  </div>
+
+  <!-- 创建表单 -->
+  <div id="uploadModal" class="modal">
+    <h2>Create New Cube</h2>
+    <form id="uploadForm">
+      <label>Name:</label><br>
+      <input type="text"
+             id="name"
+             placeholder="Your name"
+             required /><br><br>
+
+      <label>Your Words to the world:</label><br>
+      <input type="text"
+             id="phrase"
+             required /><br><br>
+
+      <label>Keywords:</label><br>
+      <input type="text" id="kw1" placeholder="Keyword1" /><br>
+      <input type="text" id="kw2" placeholder="Keyword2" /><br>
+      <input type="text" id="kw3" placeholder="Keyword3" /><br><br>
+
+      <label>Description:</label><br>
+      <textarea id="desc"
+                rows="3"
+                placeholder="optional"></textarea><br><br>
+
+      <button type="submit">Create</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+    </form>
+  </div>
+
+  <script src="three.min.js"></script>
+  <script src="OrbitControls.js"></script>
+
+  <script>
+    // 全局状态
+    let glowHelper   = null;
+    let targetGlow   = null;
+    let connectMode  = false;
+    let connectSource= null;
+    let lastProfileCube = null;
+    const cubes      = [];
+    const lines      = [];
+    const meshMap    = {};
+    let selectedParent = null;
+
+    // 初始化场景、相机、渲染器
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(
+      75,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      1000
+    );
+    camera.position.set(0, 0, 30);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(
+      camera,
+      renderer.domElement
+    );
+    controls.enableDamping = true;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+
+    // DOM Elements
+    const cubeLabel   = document.getElementById('cubeLabel');
+    const overlay     = document.getElementById('overlay');
+    const messageBox  = document.getElementById('messageBox');
+    const profileCard = document.getElementById('profileCard');
+    const connectBtn  = document.getElementById('connectBtn');
+    const deleteBtn   = document.getElementById('deleteBtn');
+    const nameEl      = document.getElementById('profileName');
+    const phraseEl    = document.getElementById('profilePhrase');
+    const keywordsEl  = document.getElementById('profileKeywords');
+    const descEl      = document.getElementById('profileDesc');
+    const plusBtn     = document.getElementById('plus');
+    const uploadModal = document.getElementById('uploadModal');
+    const cancelBtn   = document.getElementById('cancelBtn');
+    const uploadForm  = document.getElementById('uploadForm');
+
+    // 显示/隐藏模态框
+    function showModal(el) {
+      overlay.style.display = 'block';
+      el.style.display      = 'block';
+    }
+    function hideModal(el) {
+      overlay.style.display = 'none';
+      el.style.display      = 'none';
+    }
+
+    // 检查重叠
+    function isOverlapping(pos) {
+      return cubes.some(c => c.position.distanceTo(pos) < 4);
+    }
+
+    // 创建连线
+    function linkTwoCubes(a, b) {
+      const geo = new THREE.BufferGeometry().setFromPoints([
+        a.position,
+        b.position
+      ]);
+      const mat  = new THREE.LineBasicMaterial({ color: 0xffffff });
+      const line = new THREE.Line(geo, mat);
+      scene.add(line);
+      lines.push({ ids: [a.id, b.id], line });
+    }
+
+    // 创建发光效果
+    function createGlow(cube) {
+      const size   = 8;
+      const canvas = document.createElement('canvas');
+      const ctx    = canvas.getContext('2d');
+      canvas.width=canvas.height=256;
+      const grad = ctx.createRadialGradient(
+        128, 128, 0, 128, 128, 120
+      );
+      grad.addColorStop(0,   'rgba(255,255,0,0.6)');
+      grad.addColorStop(0.5, 'rgba(255,255,0,0.3)');
+      grad.addColorStop(1,   'rgba(255,255,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      const sprMat = new THREE.SpriteMaterial({
+        map: tex, transparent: true, depthWrite: false
+      });
+      const sprite = new THREE.Sprite(sprMat);
+      sprite.scale.set(size, size, 1);
+      sprite.position.copy(cube.position);
+      return sprite;
+    }
+
+    // 创建 Cube
+    function createCubeWithData(data, pos, isDefault = false) {
+      const geo = new THREE.BoxGeometry(2, 2, 2);
+      const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+      const cube = new THREE.Mesh(geo, mat);
+      cube.position.copy(pos || new THREE.Vector3());
+      cube.userData = { ...data, isDefault };
+      scene.add(cube);
+      cubes.push(cube);
+      meshMap[data.docId] = cube;
+      // if (selectedParent && !isDefault) {
+      //   linkTwoCubes(selectedParent, cube);
+      // }
+      return cube;
+    }
+
+    // 初始 Cube
+    // 初始 Cube
+    const defaultCube = createCubeWithData(
+      { phrase: 'No one is a lonely planet', keywords: [], desc: '', docId: 'default', name: 'System' },
+      new THREE.Vector3(0, 0, 0),
+      true
+    );
+    // 默认选中这个初始 cube，方便直接创建新 cube
+    selectedParent = defaultCube;
+
+
+    // 从 Firestore 加载 cubes
+    async function loadAllCubes() {
+      // 1) 读取所有 cube 文档
+      const snap = await db.collection('cubes')
+                          .orderBy('createdAt')
+                          .get();
+      // 2) 渲染立方体
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        createCubeWithData(
+          {
+            name:      d.name,
+            phrase:    d.phrase,
+            keywords:  d.keywords,
+            desc:      d.desc,
+            docId:     doc.id,
+            createdBy: d.createdBy
+          },
+          new THREE.Vector3(d.pos.x, d.pos.y, d.pos.z),
+          false
+        );
+      });
+      // 3) 渲染 parentId 关系的连线
+      snap.docs.forEach(doc => {
+        const d = doc.data();
+        if (d.parentId && meshMap[d.parentId] && meshMap[doc.id]) {
+          linkTwoCubes(meshMap[d.parentId], meshMap[doc.id]);
+        }
+      });
+    }
+
+
+    // Search 功能
+    // document.getElementById('searchBtn')
+    //   .addEventListener('click', async () => {
+    //     const kw = document.getElementById('searchInput').value.trim();
+    //     if (!kw) return;
+    //     const snap = await db.collection('cubes')
+    //                        .where('phrase', '==', kw)
+    //                        .get();
+    //     snap.forEach(doc => {
+    //       const mesh = meshMap[doc.id];
+    //       if (mesh) {
+    //         controls.target.copy(mesh.position);
+    //         camera.position.copy(
+    //           mesh.position.clone().add(
+    //             new THREE.Vector3(10, 10, 10)
+    //           )
+    //         );
+    //         camera.lookAt(mesh.position);
+    //         controls.update();
+    //       }
+    //     });
+    //   });
+
+    // + 按钮 & Form
+    plusBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!selectedParent) showModal(messageBox);
+      else uploadModal.style.display = 'block';
+    });
+    cancelBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      uploadModal.style.display = 'none';
+      uploadForm.reset();
+    });
+    uploadForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // 收集表单字段
+      const nameVal   = document.getElementById('name').value.trim();
+      const phraseVal = document.getElementById('phrase').value.trim();
+      const kws       = [
+        document.getElementById('kw1').value.trim(),
+        document.getElementById('kw2').value.trim(),
+        document.getElementById('kw3').value.trim()
+      ].filter(x => x);
+      const descVal   = document.getElementById('desc').value.trim();
+
+      // 随机选个不重叠的位置
+      let pos, attempts = 0;
+      do {
+        pos = selectedParent.position.clone().add(
+          new THREE.Vector3(
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20
+          )
+        );
+        attempts++;
+        if (attempts > 100) break;
+      } while (isOverlapping(pos));
+
+      // 写入 Firestore
+      const docRef = await db.collection('cubes').add({
+        name:      nameVal,
+        phrase:    phraseVal,
+        keywords:  kws,
+        desc:      descVal,
+        createdBy: currentUid,
+        parentId:  selectedParent.userData.docId,
+        pos:       { x: pos.x, y: pos.y, z: pos.z },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      // 本地渲染并设为下次父节点，更新发光效果
+      const newCube = createCubeWithData({
+        name:      nameVal,
+        phrase:    phraseVal,
+        keywords:  kws,
+        desc:      descVal,
+        docId:     docRef.id,
+        createdBy: currentUid
+      }, pos);
+      selectedParent = newCube;
+      if (glowHelper) scene.remove(glowHelper);
+      glowHelper = createGlow(newCube);
+      scene.add(glowHelper);
+
+      // 关闭表单
+      uploadModal.style.display = 'none';
+      uploadForm.reset();
+    });
+
+
+    // 悬停效果
+    renderer.domElement
+      .addEventListener('mousemove', e => {
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        const offsetY = 0; // 向下偏移 10 像素，你可以调这个值
+        mouse.y = - ((e.clientY + offsetY) / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(cubes);
+
+        if (hits.length) {
+          const c = hits[0].object;
+          cubeLabel.textContent = c.userData.phrase;
+          cubeLabel.style.display = 'block';
+          const p = c.position.clone();
+          p.project(camera);
+          cubeLabel.style.left = (p.x * 0.5 + 0.5) * window.innerWidth + 'px';
+          cubeLabel.style.top  = (-p.y * 0.5 + 0.5) * window.innerHeight + 'px';
+        } else {
+          cubeLabel.style.display = 'none';
+        }
+
+        if (connectMode) {
+          if (hits.length&&hits[0].object!==connectSource) {
+            if (targetGlow) scene.remove(targetGlow);
+            targetGlow = createGlow(hits[0].object);
+            scene.add(targetGlow);
+          } else if (targetGlow) {
+            scene.remove(targetGlow);
+            targetGlow = null;
+          }
+        }
+      });
+
+    // 点击 & 双击 & 连接 & 删除
+    renderer.domElement
+      .addEventListener('click', async e => {
+        e.stopPropagation();
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        const offsetY = 0; // 和上面保持一致
+        mouse.y = - ((e.clientY + offsetY) / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const h = raycaster.intersectObjects(cubes);
+
+        if (connectMode) {
+          if (h.length && h[0].object!==connectSource) {
+            linkTwoCubes(connectSource, h[0].object);
+            await db.collection('cubes')
+                    .doc(h[0].object.userData.docId)
+                    .update({ parentId: connectSource.userData.docId });
+          }
+          connectMode = false;
+          if (targetGlow) {
+            scene.remove(targetGlow);
+            targetGlow = null;
+          }
+          return;
+        }
+
+        if (glowHelper) {
+          scene.remove(glowHelper);
+          glowHelper = null;
+        }
+
+        if (h.length) {
+          selectedParent = h[0].object;
+          glowHelper = createGlow(selectedParent);
+          scene.add(glowHelper);
+        } else {
+          selectedParent = null;
+        }
+      });
+
+    renderer.domElement
+      .addEventListener('dblclick', e => {
+        e.stopPropagation();
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const h = raycaster.intersectObjects(cubes);
+
+        if (h.length) {
+          lastProfileCube = h[0].object;
+          showModal(profileCard);
+          nameEl.textContent     = lastProfileCube.userData.name || '';
+          phraseEl.textContent   = lastProfileCube.userData.phrase;
+          keywordsEl.textContent = lastProfileCube.userData.keywords.join(', ');
+          keywordsEl.style.display = lastProfileCube.userData.keywords.length ? 'block' : 'none';
+          descEl.textContent     = lastProfileCube.userData.desc;
+          descEl.style.display   = lastProfileCube.userData.desc ? 'block' : 'none';
+          deleteBtn.style.display = lastProfileCube.userData.createdBy === currentUid
+            ? 'block' : 'none';
+        }
+      });
+
+    connectBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      hideModal(profileCard);
+      connectMode = true;
+      connectSource = lastProfileCube;
+    });
+
+    deleteBtn.addEventListener('click', async e => {
+      e.stopPropagation();
+      await db.collection('cubes')
+              .doc(lastProfileCube.userData.docId)
+              .delete();
+      scene.remove(lastProfileCube);
+      hideModal(profileCard);
+    });
+
+    overlay.addEventListener('click', () => {
+      hideModal(messageBox);
+      hideModal(profileCard);
+    });
+
+    // 星空效果
+    function addStars() {
+      const cnt = 1000;
+      const geo = new THREE.BufferGeometry();
+      const posArr = new Float32Array(cnt * 3);
+      const phArr  = new Float32Array(cnt);
+      for (let i = 0; i < cnt; i++) {
+        posArr[i*3]   = (Math.random() - 0.5) * 200;
+        posArr[i*3+1] = (Math.random() - 0.5) * 200;
+        posArr[i*3+2] = (Math.random() - 0.5) * 200;
+        phArr[i] = Math.random() * Math.PI * 2;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+      geo.setAttribute('phase',    new THREE.BufferAttribute(phArr, 1));
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          time: { value: 0 },
+          color:{ value: new THREE.Color(0xffffff) },
+          size: { value: 0.25 }
+        },
+        vertexShader: `
+          attribute float phase;
+          uniform float time;
+          uniform float size;
+          varying float vOpacity;
+          void main() {
+            float f = sin(time + phase) * 0.5 + 0.5;
+            vOpacity = f;
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = size * (300.0 / -mv.z) * (0.5 + f);
+            gl_Position = projectionMatrix * mv;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 color;
+          varying float vOpacity;
+          void main() {
+            gl_FragColor = vec4(color, vOpacity);
+          }
+        `,
+
+        fragmentShader: `uniform vec3 color; varying float vOpacity;
+          void main() {
+            gl_FragColor = vec4(color, vOpacity);
+          }`,
+        transparent: true
+      });
+      const stars = new THREE.Points(geo, mat);
+      scene.add(stars);
+      return mat;
+    }
+
+    const starMat = addStars();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      starMat.uniforms.time.value = performance.now() / 1000;
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
