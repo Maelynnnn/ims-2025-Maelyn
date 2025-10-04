@@ -1,92 +1,212 @@
-/* 全屏黑色背景 */
-body {
-  margin: 0;
-  overflow: hidden;
-  background-color: black;
-  font-family: sans-serif;
+/* ===== 全局（Mobile First） ===== */
+* { box-sizing: border-box; }
+html, body { margin:0; height:100%; background:#000; font-family:"Oswald",sans-serif; overflow:hidden; }
+canvas { display:block; touch-action:none; }
+
+/* 顶部：+ 与搜索（手机基准） */
+#plus{
+  position: fixed; right:12px; top:16px;
+  width:52px; height:52px; border-radius:50%;
+  display:grid; place-items:center;
+  font-size:26px; background:transparent; color:#fff;
+  border:none; cursor:pointer; z-index:2000;
+  user-select:none; -webkit-tap-highlight-color:transparent;
 }
-/* 右上角的加号按钮 */
-#plus {
-  position: fixed;
-  top: 20px;
-  right: 20px;
-  font-size: 30px;
-  background: transparent;
-  border: none;
-  color: white;
-  cursor: pointer;
-  z-index: 10;
+#plus:active{ transform:scale(.96); }
+
+#searchBox{
+  position: fixed; right:72px; top:24px;
+  width:46vw; max-width:260px; height:34px; padding:0 12px;
+  border-radius:999px; border:1px solid rgba(255,255,255,.25);
+  background:rgba(0,0,0,.5); color:#fff; outline:none; z-index:2000;
+  backdrop-filter: blur(4px);
+  -webkit-appearance:none; appearance:none;
 }
-/* 悬停提示文字 */
-#cubeLabel {
-  position: absolute;
-  color: white;
-  background: rgba(0,0,0,0.6);
-  padding: 2px 6px;
-  border-radius: 4px;
-  pointer-events: none;
-  font-size: 14px;
-  display: none;
-  white-space: nowrap;
-  z-index: 9999;
-}
-/* 个人资料卡片 */
-#profileCard {
-  position: absolute;
-  display: none;
-  width: 300px;
-  background: rgba(255,255,255,0.95);
-  box-shadow: 0 0 20px 5px rgba(255,255,255,0.8); /* 发光效果 */
-  border-radius: 10px;
-  padding: 20px;
-  color: #000;
-  z-index: 9999;
-}
-#profileCard img {
-  width: 100%;
-  height: auto;
-  border-radius: 5px;
-  margin-bottom: 10px;
-}
-#profileCard p {
-  margin: 0 0 10px 0;
-  line-height: 1.4;
+#searchBox::placeholder{ color:rgba(255,255,255,.6); }
+
+/* 多标签容器 */
+#labelLayer{ position:fixed; inset:0; pointer-events:none; z-index:1500; }
+.cubeLabel{
+  position:absolute; color:#fff; background:rgba(0,0,0,.7);
+  padding:4px 8px; border-radius:4px; box-shadow:0 0 10px rgba(255,255,255,.8);
+  opacity:0; transition:opacity .3s ease; will-change:transform,opacity;
 }
 
-/* 居中弹出的表单对话框 */
-#uploadModal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: rgba(255,255,255,0.95);
-  box-shadow: 0 0 20px 5px rgba(255,255,255,0.8);
-  border-radius: 10px;
-  padding: 20px;
-  width: 300px;
-  display: none; /* 初始隐藏 */
-  z-index: 9999;
-  color: #000;
+/* 底部时间轴（手机基准） */
+#timelineBar{
+  position:fixed; left:50%; bottom:12px; transform:translateX(-50%);
+  width:92vw;
+  display:flex; align-items:center; gap:8px;
+  padding:6px 10px; border-radius:999px;
+  backdrop-filter:blur(10px) saturate(120%);
+  color:#fff; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.25);
+  z-index:1900;
 }
-#uploadModal h2 {
-  margin-top: 0;
-  margin-bottom: 10px;
+#timeSlider{
+  flex:1 1 auto; min-width:0; height:18px;
+  -webkit-appearance:none; appearance:none;
+  background:transparent; outline:none;
 }
-#uploadModal label {
-  display: block;
-  margin: 10px 0 5px 0;
-  font-weight: bold;
+#timeSlider::-webkit-slider-runnable-track{ height:3px; background:rgba(255,255,255,.8); border-radius:999px; }
+#timeSlider::-webkit-slider-thumb{
+  -webkit-appearance:none; width:12px; height:12px; margin-top:-4.5px; border-radius:50%;
+  background:#fff; cursor:pointer;
 }
-#uploadModal input[type="text"],
-#uploadModal textarea {
-  width: 100%;
-  box-sizing: border-box;
+#timeSlider::-moz-range-track{ height:3px; background:rgba(255,255,255,.8); border-radius:999px; }
+#timeSlider::-moz-range-thumb{ width:12px; height:12px; border-radius:50%; background:#fff; cursor:pointer; }
+#timeLabel{ display:none; } /* 如需显示日期，删掉此行 */
+
+/* 遮罩 */
+#overlay{ display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:1000; }
+
+/* 模态：统一开关（默认隐藏，用 .open 显示） */
+.modal{
+  display:none;
+  position:fixed; top:50%; left:50%;
+  transform:translate(-50%, -50%);
+  padding:16px; border-radius:12px;
+  background:rgba(18,18,18,0.65); color:#fff;
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:0 0 20px 5px rgba(255,255,255,0.2);
+  backdrop-filter:blur(12px) saturate(130%);
+  z-index:1500; max-width:92vw;
 }
-#uploadModal input[type="file"] {
-  width: 100%;
+.modal.open{ display:block; }
+
+/* 资料卡（手机基准） */
+#profileCard{
+  width:92vw; max-width:92vw;
+  height:auto; max-height:82vh;
+  overflow-y:auto; box-sizing:border-box; word-break:break-word;
 }
-#uploadModal button {
-  margin-top: 10px;
-  padding: 8px 16px;
-  cursor: pointer;
+#profileCard.open{ display:flex; flex-direction:column; gap:10px; }
+
+.card-title { font-weight:700; font-size:22px; color:#ffe680; margin:0 0 8px; }
+.card-phrase{ font-weight:600; font-size:18px; color:#fff;    margin:0 0 6px; }
+.card-kws   { font-style:italic; font-size:16px; color:#ccc;  margin:0 0 10px; }
+.card-desc  { color:#ddd; font-size:16px; line-height:1.5; }
+.card-actions{ margin-top:auto; display:flex; gap:14px; }
+
+/* Profile Card 按钮（含 Connect To） */
+#profileCard button{
+  appearance:none;
+  border:1px solid rgba(255,255,255,0.18);
+  background:rgba(255,255,255,0.08);
+  color:#fff;
+  padding:10px 14px;
+  font-size:16px; font-weight:600; line-height:1;
+  border-radius:999px; min-height:40px;
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  cursor:pointer; transition:background .2s, transform .08s, box-shadow .2s, border-color .2s;
+  box-shadow:0 4px 20px rgba(0,0,0,0.25);
+  backdrop-filter:blur(6px) saturate(120%);
+}
+#profileCard button:hover{ background:rgba(255,255,255,0.14); }
+#profileCard button:active{ transform:translateY(1px) scale(0.99); }
+#profileCard button:focus-visible{ outline:none; box-shadow:0 0 0 3px rgba(255,255,255,0.18); }
+
+/* 主要按钮：Connect To */
+#connectBtn{
+  background: linear-gradient(180deg, rgba(66,66,66,0.52), rgba(210,210,255,0.10));
+  border-color: rgba(210,210,255,0.35);
+  font-size:18px;
+}
+#connectBtn:hover{
+  background: linear-gradient(180deg, rgba(66,66,66,0.58), rgba(230,230,255,0.16));
+  border-color: rgba(230,230,255,0.50);
+}
+#connectBtn:active{ transform: translateY(1px) scale(0.985); }
+
+/* 只放大 “choose a cube to connect” 这条提示 */
+#messageBox{
+  font-size:22px; font-weight:700; line-height:1.25;
+  text-align:center; padding:20px 22px;
+}
+
+/* 创建表单（手机基准：不放大） */
+#uploadModal{
+  width:92vw; max-width:92vw;
+  padding:16px;
+  transform:translate(-50%, -50%) scale(1);
+  transform-origin:center center;
+}
+#uploadModal h2{ margin:0 0 10px; font-size:20px; }
+#uploadModal label{ display:block; margin:10px 0 6px; font-weight:700; font-size:14px; }
+#uploadModal input[type="text"], #uploadModal textarea{
+  width:100%; background:rgba(255,255,255,0.06); color:#fff;
+  border:1px solid rgba(255,255,255,0.2); border-radius:8px; padding:8px 10px; font-size:14px;
+}
+#uploadModal textarea{ resize:vertical; min-height:80px; }
+.form-actions{ margin-top:12px; display:flex; gap:12px; }
+#uploadModal button{
+  font-size:16px; padding:10px 14px; cursor:pointer; border-radius:8px;
+  border:1px solid rgba(255,255,255,0.2);
+  background:rgba(255,255,255,0.1); color:#fff;
+}
+#uploadModal button:hover{ background:rgba(255,255,255,0.18); }
+
+/* ===== 中等屏（平板/小笔电）：适度放大 ===== */
+@media (min-width: 641px){
+  #plus{ right:16px; top:20px; width:60px; height:60px; font-size:30px; }
+  #searchBox{ right:96px; top:28px; width:260px; height:36px; }
+
+  #timelineBar{ width: clamp(360px, 70vw, 900px); padding:8px 12px; }
+  #timeSlider::-webkit-slider-thumb{ width:14px; height:14px; margin-top:-5.5px; }
+  #timeSlider::-moz-range-thumb{ width:14px; height:14px; }
+
+  #profileCard{
+    width:min(86vw, 600px);
+    max-width:min(86vw, 600px);
+    max-height:84vh;
+    padding:18px;
+  }
+  .card-title{ font-size: clamp(22px, 3.2vw, 28px); }
+  .card-phrase{ font-size: clamp(18px, 2.4vw, 22px); }
+  .card-kws, .card-desc{ font-size: clamp(16px, 2.0vw, 18px); }
+
+  #uploadModal{
+    width:min(86vw, 640px);
+    max-width:min(86vw, 640px);
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+
+  #messageBox{ font-size: 26px; padding: 22px 26px; }
+}
+
+/* ===== 桌面端：放大到 1.5×（你的原始需求） ===== */
+@media (min-width: 1025px){
+  #plus{ width:64px; height:64px; font-size:32px; }
+  #searchBox{ right:96px; top:33px; width:220px; height:36px; }
+
+  #timelineBar{
+    width: clamp(500px, 60vw, 1100px);
+    padding: 8px 12px;
+  }
+
+  #profileCard{
+    width: min(90vw, 600px);
+    max-width: min(90vw, 600px);
+    padding: 24px;
+  }
+  .card-title{ font-size: 30px; }
+  .card-phrase{ font-size: 28px; }
+  .card-kws, .card-desc{ font-size: 25px; }
+
+  /* 表单在桌面端视觉 1.5× */
+  #uploadModal{
+    width: 80%;
+    max-width: 760px;
+    transform: translate(-50%, -50%) scale(1.5) !important;
+  }
+
+  #messageBox{ font-size: 28px; padding: 24px 28px; }
+}
+
+/* ===== 超矮屏（横屏小屏等） ===== */
+@media (max-height: 700px){
+  #profileCard{ max-height: 78vh; }
+}
+@media (max-height: 500px){
+  #profileCard{ max-height: 58vh; }
+  #uploadModal{ transform: translate(-50%, -50%) scale(0.9); max-height: 60vh; }
 }

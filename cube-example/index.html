@@ -2,15 +2,28 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Cube Structure with Stars</title>
+  <title>No One Is a Lonely Planet</title>
+
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="pnt.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="pnt.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="pnt.png">
+  <link rel="apple-touch-icon" href="pnt.png">
+  <meta name="theme-color" content="#000000">
+
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+  <!-- Styles -->
   <link rel="stylesheet" href="style.css" />
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200..700" rel="stylesheet">
   <script>
-    // Firebase 初始化
     const firebaseConfig = {
       apiKey: "AIzaSyCceRTMXc7k1SyHZQVdzZZkQRPNqThdEDY",
       authDomain: "nooneisalonglyplanet.firebaseapp.com",
@@ -23,161 +36,90 @@
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db   = firebase.firestore();
-
-    // 匿名登录并加载已有 cubes
     auth.signInAnonymously().catch(console.error);
     auth.onAuthStateChanged(user => {
-      if (user) {
-        window.currentUid = user.uid;
-        loadAllCubes();
-      }
+      if (user) { window.currentUid = user.uid; loadAllCubes(); }
     });
   </script>
-
-  <style>
-    /* 悬停提示标签 */
-    #cubeLabel {
-      display: none;
-      position: absolute;
-      color: #fff;
-      background: rgba(0,0,0,0.7);
-      padding: 4px 8px;
-      border-radius: 4px;
-      pointer-events: none;
-      z-index: 1500;
-      box-shadow: 0 0 10px rgba(255,255,255,0.8);
-    }
-    /* 遮罩层 */
-    #overlay {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.3);
-      z-index: 1000;
-    }
-    /* 中央模态框 */
-    .modal {
-      display: none;
-      position: fixed;
-      top: 50%; left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 20px;
-      border-radius: 8px;
-      background: #fff;
-      box-shadow: 0 0 20px rgba(255,255,255,0.8);
-      z-index: 1500;
-    }
-    #messageBox { cursor: pointer; }
-    #profileCard { background: rgba(0,0,0,0.8); max-width: 300px; color: #fff; }
-    #uploadModal { background: #fff; }
-  </style>
 </head>
 
 <body>
+  <!-- 顶部：搜索 + 加号 -->
+  <input id="searchBox" type="search" placeholder="Search…" />
   <button id="plus">+</button>
-  <!-- <input  id="searchInput"
-          placeholder="Search phrase"
-          style="margin-left:10px;" />
-  <button id="searchBtn">Search</button> -->
 
-  <div id="cubeLabel"></div>
+  <!-- 多标签容器（允许同时显示多条短句） -->
+  <div id="labelLayer"></div>
+
+  <!-- 遮罩 & 模态框 -->
   <div id="overlay"></div>
 
-  <!-- 提示框 -->
-  <div id="messageBox" class="modal">
-    choose a cube to connect 
-  </div>
+  <div id="messageBox" class="modal">choose a cube to connect</div>
 
-  <!-- 资料卡 -->
   <div id="profileCard" class="modal">
-    <p id="profileName"
-       style="font-weight:bold; color:#ffe680;"></p>
-    <p id="profilePhrase"
-       style="font-weight:bold; color:#fff;"></p>
-    <p id="profileKeywords"
-       style="font-style:italic; color:#ccc; display:none;"></p>
-    <p id="profileDesc"
-       style="color:#ddd; display:none;"></p>
-    <div style="margin-top:10px; display:flex; gap:20px;">
-      <button id="connectBtn">Connect To</button>
+    <p id="profileName" class="card-title"></p>
+    <p id="profilePhrase" class="card-phrase"></p>
+    <p id="profileKeywords" class="card-kws" style="display:none;"></p>
+    <p id="profileDesc" class="card-desc" style="display:none;"></p>
+    <div class="card-actions">
+      <button id="connectBtn" >Connect To</button>
       <button id="deleteBtn" style="display:none;">Delete Cube</button>
     </div>
   </div>
 
-  <!-- 创建表单 -->
   <div id="uploadModal" class="modal">
     <h2>Create New Cube</h2>
     <form id="uploadForm">
-      <label>Name:</label><br>
-      <input type="text"
-             id="name"
-             placeholder="Your name"
-             required /><br><br>
+      <label>Name:</label>
+      <input type="text" id="name" placeholder="Your name" required />
 
-      <label>Your Words to the world:</label><br>
-      <input type="text"
-             id="phrase"
-             required /><br><br>
+      <label>Your Words to the world:</label>
+      <input type="text" id="phrase" required />
 
-      <label>Keywords:</label><br>
-      <input type="text" id="kw1" placeholder="Keyword1" /><br>
-      <input type="text" id="kw2" placeholder="Keyword2" /><br>
-      <input type="text" id="kw3" placeholder="Keyword3" /><br><br>
+      <label>Keywords:</label>
+      <input type="text" id="kw1" placeholder="Keyword1" />
+      <input type="text" id="kw2" placeholder="Keyword2" />
+      <input type="text" id="kw3" placeholder="Keyword3" />
 
-      <label>Description:</label><br>
-      <textarea id="desc"
-                rows="3"
-                placeholder="optional"></textarea><br><br>
+      <label>Description:</label>
+      <textarea id="desc" rows="3" placeholder="optional"></textarea>
 
-      <button type="submit">Create</button>
-      <button type="button" id="cancelBtn">Cancel</button>
+      <div class="form-actions">
+        <button type="submit">Create</button>
+        <button type="button" id="cancelBtn">Cancel</button>
+      </div>
     </form>
   </div>
 
+  <!-- 底部时间轴（按天） -->
+  <div id="timelineBar">
+    <input id="timeSlider" type="range" min="0" max="100" step="86400000" value="100" />
+    <span id="timeLabel">Now</span>
+  </div>
+
+  <!-- libs -->
   <script src="three.min.js"></script>
   <script src="OrbitControls.js"></script>
 
+  <!-- App -->
   <script>
-    // 全局状态
-    let glowHelper   = null;
-    let targetGlow   = null;
-    let connectMode  = false;
-    let connectSource= null;
+    // ===== 全局状态 =====
+    let glowHelper = null, targetGlow = null;
+    let connectMode = false, connectSource = null;
     let lastProfileCube = null;
-    const cubes      = [];
-    const lines      = [];
-    const meshMap    = {};
     let selectedParent = null;
 
-    // 初始化场景、相机、渲染器
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+    const cubes = [];                // THREE.Mesh[]
+    const lines = [];                // { ids, line, a, b, createdAtMs }
+    const meshMap = {};              // docId -> cube
+    const pulses = [];               // 随机发光动画队列
+    const searchGlows = new Map();   // docId -> Sprite(红光)
+    let hoveredCube = null, hoverGlow = null;
 
-    const camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    camera.position.set(0, 0, 30);
+    const labelLayer = document.getElementById('labelLayer');
+    const labelMap = new Map();      // key -> DOM label
+    const searchBox = document.getElementById('searchBox');
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    const controls = new THREE.OrbitControls(
-      camera,
-      renderer.domElement
-    );
-    controls.enableDamping = true;
-
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-    const raycaster = new THREE.Raycaster();
-    const mouse     = new THREE.Vector2();
-
-    // DOM Elements
-    const cubeLabel   = document.getElementById('cubeLabel');
     const overlay     = document.getElementById('overlay');
     const messageBox  = document.getElementById('messageBox');
     const profileCard = document.getElementById('profileCard');
@@ -192,390 +134,495 @@
     const cancelBtn   = document.getElementById('cancelBtn');
     const uploadForm  = document.getElementById('uploadForm');
 
-    // 显示/隐藏模态框
+    // ===== Three 场景 =====
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 30);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.domElement.style.touchAction = 'none';
+    document.body.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+    const raycaster = new THREE.Raycaster();
+    const mouse     = new THREE.Vector2();
+
+    // ===== 工具函数 =====
     function showModal(el) {
       overlay.style.display = 'block';
-      el.style.display      = 'block';
+      el.classList.add('open');     // ★ 只加类
     }
     function hideModal(el) {
       overlay.style.display = 'none';
-      el.style.display      = 'none';
+      el.classList.remove('open');  // ★ 去掉类
     }
 
-    // 检查重叠
-    function isOverlapping(pos) {
-      return cubes.some(c => c.position.distanceTo(pos) < 4);
+    function isOverlapping(pos){ return cubes.some(c => c.position.distanceTo(pos) < 4); }
+    const DAY_MS = 24*60*60*1000;
+    const startOfDay = (ms)=>{ const d=new Date(ms); d.setHours(0,0,0,0); return d.getTime(); };
+    const endOfDay   = (ms)=> startOfDay(ms)+DAY_MS-1;
+    const fmtDay     = (ms)=>{ const d=new Date(ms); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+    const msFromTS   = (ts)=> ts && typeof ts.toMillis==='function' ? ts.toMillis() : null;
+
+    function ensureLabel(cube){
+      const key = cube.userData.docId || cube.uuid;
+      if (labelMap.has(key)) return labelMap.get(key);
+      const el = document.createElement('div');
+      el.className = 'cubeLabel';
+      el.dataset.key = key;
+      labelLayer.appendChild(el);
+      labelMap.set(key, el);
+      return el;
+    }
+    function setLabel(cube, alpha){
+      const el = ensureLabel(cube);
+      el.textContent = cube.userData.phrase || '';
+      const p = cube.position.clone(); p.project(camera);
+      el.style.left = (p.x * 0.5 + 0.5) * window.innerWidth + 'px';
+      el.style.top  = (-p.y * 0.5 + 0.5) * window.innerHeight + 'px';
+      el.style.opacity = Math.max(0, Math.min(1, alpha));
     }
 
-    // 创建连线
-    function linkTwoCubes(a, b) {
-      const geo = new THREE.BufferGeometry().setFromPoints([
-        a.position,
-        b.position
-      ]);
-      const mat  = new THREE.LineBasicMaterial({ color: 0xffffff });
-      const line = new THREE.Line(geo, mat);
-      scene.add(line);
-      lines.push({ ids: [a.id, b.id], line });
-    }
-
-    // 创建发光效果
-    function createGlow(cube) {
-      const size   = 8;
+    // Glow
+    function createGlow(cube, color='yellow'){
+      const size = (color==='red') ? 10 : 8;
       const canvas = document.createElement('canvas');
       const ctx    = canvas.getContext('2d');
-      canvas.width=canvas.height=256;
-      const grad = ctx.createRadialGradient(
-        128, 128, 0, 128, 128, 120
-      );
-      grad.addColorStop(0,   'rgba(255,255,0,0.6)');
-      grad.addColorStop(0.5, 'rgba(255,255,0,0.3)');
-      grad.addColorStop(1,   'rgba(255,255,0,0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 256, 256);
-
+      canvas.width = canvas.height = 256;
+      const rgb = color==='red' ? [255,0,0] : [255,255,0];
+      const [r,g,b] = rgb;
+      const grad = ctx.createRadialGradient(128,128,0, 128,128,120);
+      grad.addColorStop(0,   `rgba(${r},${g},${b},0.65)`);
+      grad.addColorStop(0.5, `rgba(${r},${g},${b},0.30)`);
+      grad.addColorStop(1,   `rgba(${r},${g},${b},0.00)`);
+      ctx.fillStyle = grad; ctx.fillRect(0,0,256,256);
       const tex = new THREE.CanvasTexture(canvas);
-      const sprMat = new THREE.SpriteMaterial({
-        map: tex, transparent: true, depthWrite: false
-      });
+      const sprMat = new THREE.SpriteMaterial({ map: tex, transparent:true, depthWrite:false, opacity:1 });
       const sprite = new THREE.Sprite(sprMat);
       sprite.scale.set(size, size, 1);
       sprite.position.copy(cube.position);
       return sprite;
     }
+    function makeGlowFor(cube, initialOpacity=1){
+      const g = createGlow(cube);
+      g.material.opacity = initialOpacity;
+      scene.add(g);
+      return g;
+    }
 
-    // 创建 Cube
-    function createCubeWithData(data, pos, isDefault = false) {
+    // Mesh 构造
+    function createCubeWithData(data, pos, isDefault=false){
       const geo = new THREE.BoxGeometry(2, 2, 2);
       const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
       const cube = new THREE.Mesh(geo, mat);
       cube.position.copy(pos || new THREE.Vector3());
-      cube.userData = { ...data, isDefault };
+      const createdAtMs =
+        data?.createdAtMs ?? (data?.createdAt && data.createdAt.toMillis ? data.createdAt.toMillis() : null) ?? (isDefault ? 0 : Date.now());
+      cube.userData = { ...data, isDefault, createdAtMs };
       scene.add(cube);
       cubes.push(cube);
       meshMap[data.docId] = cube;
-      // if (selectedParent && !isDefault) {
-      //   linkTwoCubes(selectedParent, cube);
-      // }
       return cube;
     }
 
-    // 初始 Cube
-    // 初始 Cube
+    function linkTwoCubes(a, b, createdAtMs=Date.now()){
+      const geo = new THREE.BufferGeometry().setFromPoints([a.position, b.position]);
+      const mat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent:true, opacity:1 });
+      const line = new THREE.Line(geo, mat);
+      line.userData = { createdAtMs };
+      scene.add(line);
+      lines.push({ ids:[a.id,b.id], line, a, b, createdAtMs });
+      return line;
+    }
+
+    // 默认 cube
     const defaultCube = createCubeWithData(
-      { phrase: 'No one is a lonely planet', keywords: [], desc: '', docId: 'default', name: 'System' },
-      new THREE.Vector3(0, 0, 0),
+      { phrase: 'No one is a lonely planet', keywords: [], desc: '', docId: 'default', name: 'System', createdAtMs: 0 },
+      new THREE.Vector3(0,0,0),
       true
     );
-    // 默认选中这个初始 cube，方便直接创建新 cube
-    selectedParent = defaultCube;
 
+    // 加载 Firestore
+    async function loadAllCubes(){
+      const snap = await db.collection('cubes').orderBy('createdAt').get();
 
-    // 从 Firestore 加载 cubes
-    async function loadAllCubes() {
-      // 1) 读取所有 cube 文档
-      const snap = await db.collection('cubes')
-                          .orderBy('createdAt')
-                          .get();
-      // 2) 渲染立方体
-      snap.docs.forEach(doc => {
+      // 节点
+      snap.docs.forEach(doc=>{
         const d = doc.data();
+        const createdAtMs = msFromTS(d.createdAt) ?? Date.now();
         createCubeWithData(
-          {
-            name:      d.name,
-            phrase:    d.phrase,
-            keywords:  d.keywords,
-            desc:      d.desc,
-            docId:     doc.id,
-            createdBy: d.createdBy
-          },
+          { name:d.name, phrase:d.phrase, keywords:d.keywords, desc:d.desc, docId:doc.id, createdBy:d.createdBy, createdAt:d.createdAt, createdAtMs },
           new THREE.Vector3(d.pos.x, d.pos.y, d.pos.z),
           false
         );
       });
-      // 3) 渲染 parentId 关系的连线
-      snap.docs.forEach(doc => {
+
+      // 连线（以子节点的出生时间为连线时间）
+      snap.docs.forEach(doc=>{
         const d = doc.data();
         if (d.parentId && meshMap[d.parentId] && meshMap[doc.id]) {
-          linkTwoCubes(meshMap[d.parentId], meshMap[doc.id]);
+          const child = meshMap[doc.id];
+          const born  = child.userData.createdAtMs ?? msFromTS(d.createdAt) ?? Date.now();
+          linkTwoCubes(meshMap[d.parentId], child, born);
         }
       });
+
+      initTimeline(); // 完成后初始化时间轴
     }
 
-
-    // Search 功能
-    // document.getElementById('searchBtn')
-    //   .addEventListener('click', async () => {
-    //     const kw = document.getElementById('searchInput').value.trim();
-    //     if (!kw) return;
-    //     const snap = await db.collection('cubes')
-    //                        .where('phrase', '==', kw)
-    //                        .get();
-    //     snap.forEach(doc => {
-    //       const mesh = meshMap[doc.id];
-    //       if (mesh) {
-    //         controls.target.copy(mesh.position);
-    //         camera.position.copy(
-    //           mesh.position.clone().add(
-    //             new THREE.Vector3(10, 10, 10)
-    //           )
-    //         );
-    //         camera.lookAt(mesh.position);
-    //         controls.update();
-    //       }
-    //     });
-    //   });
-
-    // + 按钮 & Form
-    plusBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      if (!selectedParent) showModal(messageBox);
-      else uploadModal.style.display = 'block';
-    });
-    cancelBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      uploadModal.style.display = 'none';
-      uploadForm.reset();
-    });
-    uploadForm.addEventListener('submit', async e => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // 收集表单字段
-      const nameVal   = document.getElementById('name').value.trim();
-      const phraseVal = document.getElementById('phrase').value.trim();
-      const kws       = [
-        document.getElementById('kw1').value.trim(),
-        document.getElementById('kw2').value.trim(),
-        document.getElementById('kw3').value.trim()
-      ].filter(x => x);
-      const descVal   = document.getElementById('desc').value.trim();
-
-      // 随机选个不重叠的位置
-      let pos, attempts = 0;
-      do {
-        pos = selectedParent.position.clone().add(
-          new THREE.Vector3(
-            (Math.random() - 0.5) * 20,
-            (Math.random() - 0.5) * 20,
-            (Math.random() - 0.5) * 20
-          )
-        );
-        attempts++;
-        if (attempts > 100) break;
-      } while (isOverlapping(pos));
-
-      // 写入 Firestore
-      const docRef = await db.collection('cubes').add({
-        name:      nameVal,
-        phrase:    phraseVal,
-        keywords:  kws,
-        desc:      descVal,
-        createdBy: currentUid,
-        parentId:  selectedParent.userData.docId,
-        pos:       { x: pos.x, y: pos.y, z: pos.z },
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    // 星空
+    function addStars(){
+      const cnt=1000, geo=new THREE.BufferGeometry();
+      const posArr=new Float32Array(cnt*3), phArr=new Float32Array(cnt);
+      for(let i=0;i<cnt;i++){
+        posArr[i*3]=(Math.random()-0.5)*200;
+        posArr[i*3+1]=(Math.random()-0.5)*200;
+        posArr[i*3+2]=(Math.random()-0.5)*200;
+        phArr[i]=Math.random()*Math.PI*2;
+      }
+      geo.setAttribute('position', new THREE.BufferAttribute(posArr,3));
+      geo.setAttribute('phase', new THREE.BufferAttribute(phArr,1));
+      const mat=new THREE.ShaderMaterial({
+        uniforms:{ time:{value:0}, color:{value:new THREE.Color(0xffffff)}, size:{value:0.25} },
+        vertexShader:`attribute float phase; uniform float time; uniform float size; varying float vOpacity;
+        void main(){ float f=sin(time+phase)*0.5+0.5; vOpacity=f; vec4 mv=modelViewMatrix*vec4(position,1.0);
+        gl_PointSize=size*(300.0/-mv.z)*(0.5+f); gl_Position=projectionMatrix*mv; }`,
+        fragmentShader:`uniform vec3 color; varying float vOpacity; void main(){ gl_FragColor=vec4(color, vOpacity);} `,
+        transparent:true
       });
+      const stars=new THREE.Points(geo,mat); scene.add(stars); return mat;
+    }
+    const starMat = addStars();
 
-      // 本地渲染并设为下次父节点，更新发光效果
-      const newCube = createCubeWithData({
-        name:      nameVal,
-        phrase:    phraseVal,
-        keywords:  kws,
-        desc:      descVal,
-        docId:     docRef.id,
-        createdBy: currentUid
-      }, pos);
-      selectedParent = newCube;
-      if (glowHelper) scene.remove(glowHelper);
-      glowHelper = createGlow(newCube);
-      scene.add(glowHelper);
-
-      // 关闭表单
-      uploadModal.style.display = 'none';
-      uploadForm.reset();
-    });
-
-
-    // 悬停效果
-    renderer.domElement
-      .addEventListener('mousemove', e => {
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        const offsetY = 0; // 向下偏移 10 像素，你可以调这个值
-        mouse.y = - ((e.clientY + offsetY) / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const hits = raycaster.intersectObjects(cubes);
-
-        if (hits.length) {
-          const c = hits[0].object;
-          cubeLabel.textContent = c.userData.phrase;
-          cubeLabel.style.display = 'block';
-          const p = c.position.clone();
-          p.project(camera);
-          cubeLabel.style.left = (p.x * 0.5 + 0.5) * window.innerWidth + 'px';
-          cubeLabel.style.top  = (-p.y * 0.5 + 0.5) * window.innerHeight + 'px';
-        } else {
-          cubeLabel.style.display = 'none';
-        }
-
-        if (connectMode) {
-          if (hits.length&&hits[0].object!==connectSource) {
-            if (targetGlow) scene.remove(targetGlow);
-            targetGlow = createGlow(hits[0].object);
-            scene.add(targetGlow);
-          } else if (targetGlow) {
-            scene.remove(targetGlow);
-            targetGlow = null;
+    // ===== 搜索 =====
+    function debounce(fn, wait=120){ let t=null; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), wait); }; }
+    function cubeMatchesTerm(cube, term){
+      if (!term) return false;
+      const t = term.toLowerCase();
+      const ud = cube.userData || {};
+      const inPhrase = (ud.phrase || '').toLowerCase().includes(t);
+      const inDesc   = (ud.desc   || '').toLowerCase().includes(t);
+      const inKW     = Array.isArray(ud.keywords) && ud.keywords.some(k => (k||'').toLowerCase().includes(t));
+      return inPhrase || inDesc || inKW;
+    }
+    function updateSearchHighlights(q){
+      const term = (q || '').trim().toLowerCase();
+      const matched = new Set();
+      if (term){
+        for (const c of cubes){
+          if (!c.visible) continue; // 只高亮当前时间轴可见的
+          if (cubeMatchesTerm(c, term)){
+            const id = (c.userData && c.userData.docId) || c.uuid;
+            matched.add(id);
+            if (!searchGlows.has(id)){
+              const redGlow = createGlow(c, 'red');
+              redGlow.material.opacity = 1;
+              searchGlows.set(id, redGlow);
+              scene.add(redGlow);
+            }
           }
         }
-      });
+      }
+      for (const [id, spr] of searchGlows.entries()){
+        if (!matched.has(id)){ scene.remove(spr); searchGlows.delete(id); }
+      }
+    }
+    searchBox.addEventListener('input', debounce((e)=>{ updateSearchHighlights(e.target.value); }));
+    searchBox.addEventListener('keydown', (e)=>{ if (e.key==='Escape'){ searchBox.value=''; updateSearchHighlights(''); } });
 
-    // 点击 & 双击 & 连接 & 删除
-    renderer.domElement
-      .addEventListener('click', async e => {
-        e.stopPropagation();
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        const offsetY = 0; // 和上面保持一致
-        mouse.y = - ((e.clientY + offsetY) / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const h = raycaster.intersectObjects(cubes);
+    // ===== 时间轴（天粒度）=====
+    const timeSlider = document.getElementById('timeSlider');
+    const timeLabel  = document.getElementById('timeLabel');
+    const timeline = { minMs:0, maxMs:0, currentMs:0 };
 
-        if (connectMode) {
-          if (h.length && h[0].object!==connectSource) {
-            linkTwoCubes(connectSource, h[0].object);
-            await db.collection('cubes')
-                    .doc(h[0].object.userData.docId)
-                    .update({ parentId: connectSource.userData.docId });
-          }
-          connectMode = false;
-          if (targetGlow) {
-            scene.remove(targetGlow);
-            targetGlow = null;
-          }
-          return;
+    function setTimeline(ms){
+      // ms 取当天 00:00
+      timeline.currentMs = startOfDay(ms);
+      const dayEnd = endOfDay(ms);
+
+      // 1) 节点可见性
+      for (const c of cubes){
+        if (c.userData.isDefault) { c.visible = true; continue; }
+        const born = c.userData.createdAtMs ?? 0;
+        c.visible = (born <= dayEnd);
+
+        // 清理不可见的搜索红光
+        if (!c.visible){
+          const id = c.userData.docId;
+          if (id && searchGlows.has(id)){ scene.remove(searchGlows.get(id)); searchGlows.delete(id); }
         }
+      }
 
-        if (glowHelper) {
-          scene.remove(glowHelper);
-          glowHelper = null;
-        }
+      // 2) 连线可见性
+      for (const rec of lines){
+        const born = rec.createdAtMs ?? 0;
+        rec.line.visible = (born <= dayEnd) && rec.a.visible && rec.b.visible;
+      }
 
-        if (h.length) {
-          selectedParent = h[0].object;
-          glowHelper = createGlow(selectedParent);
-          scene.add(glowHelper);
-        } else {
-          selectedParent = null;
-        }
-      });
+      // 3) 标签
+      if (ms >= startOfDay(timeline.maxMs)) timeLabel.textContent = 'Now';
+      else timeLabel.textContent = fmtDay(ms);
 
-    renderer.domElement
-      .addEventListener('dblclick', e => {
-        e.stopPropagation();
-        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const h = raycaster.intersectObjects(cubes);
+      // 4) 清理不可见节点的脉冲
+      for (let i=pulses.length-1; i>=0; i--){
+        if (!pulses[i].cube.visible){ scene.remove(pulses[i].glow); pulses.splice(i,1); }
+      }
+    }
 
-        if (h.length) {
-          lastProfileCube = h[0].object;
-          showModal(profileCard);
-          nameEl.textContent     = lastProfileCube.userData.name || '';
-          phraseEl.textContent   = lastProfileCube.userData.phrase;
-          keywordsEl.textContent = lastProfileCube.userData.keywords.join(', ');
-          keywordsEl.style.display = lastProfileCube.userData.keywords.length ? 'block' : 'none';
-          descEl.textContent     = lastProfileCube.userData.desc;
-          descEl.style.display   = lastProfileCube.userData.desc ? 'block' : 'none';
-          deleteBtn.style.display = lastProfileCube.userData.createdBy === currentUid
-            ? 'block' : 'none';
-        }
-      });
+    function initTimeline(){
+      const times = cubes.filter(c=>!c.userData.isDefault && c.userData.createdAtMs!=null).map(c=>c.userData.createdAtMs);
+      if (!times.length){
+        timeline.minMs = startOfDay(Date.now());
+        timeline.maxMs = timeline.minMs;
+        timeSlider.disabled = true;
+        timeSlider.min = timeline.minMs; timeSlider.max = timeline.maxMs; timeSlider.value = timeline.maxMs;
+        timeLabel.textContent = 'Now';
+        return;
+      }
+      timeline.minMs = startOfDay(Math.min(...times));
+      timeline.maxMs = startOfDay(Math.max(...times));
+      timeSlider.disabled = false;
+      timeSlider.min  = timeline.minMs;
+      timeSlider.max  = timeline.maxMs;
+      timeSlider.step = DAY_MS;          // 每天一步
+      timeSlider.value = timeline.maxMs; // 默认最新
+      setTimeline(timeline.maxMs);
+    }
 
-    connectBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      hideModal(profileCard);
-      connectMode = true;
-      connectSource = lastProfileCube;
+    timeSlider.addEventListener('input', (e)=>{
+      const snapped = startOfDay(+e.target.value);
+      if (+e.target.value !== snapped) timeSlider.value = snapped;
+      setTimeline(snapped);
     });
 
-    deleteBtn.addEventListener('click', async e => {
-      e.stopPropagation();
-      await db.collection('cubes')
-              .doc(lastProfileCube.userData.docId)
-              .delete();
-      scene.remove(lastProfileCube);
-      hideModal(profileCard);
+    // ===== 交互 =====
+    // 桌面 hover
+    renderer.domElement.addEventListener('pointermove', (e)=>{
+      if (e.pointerType !== 'mouse') return;
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(cubes);
+      if (hits.length){
+        const c = hits[0].object;
+        hoveredCube = c;
+        if (hoverGlow) scene.remove(hoverGlow);
+        hoverGlow = makeGlowFor(c, 1);
+      } else {
+        hoveredCube = null;
+        if (hoverGlow){ scene.remove(hoverGlow); hoverGlow=null; }
+      }
+      if (connectMode){
+        if (hits.length && hits[0].object !== connectSource){
+          if (targetGlow) scene.remove(targetGlow);
+          targetGlow = createGlow(hits[0].object); scene.add(targetGlow);
+        } else if (targetGlow){
+          scene.remove(targetGlow); targetGlow=null;
+        }
+      }
     });
 
+    // 点击选择 / 清空
+    renderer.domElement.addEventListener('click', async (e)=>{
+      e.stopPropagation();
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(cubes);
+
+      if (connectMode){
+        if (hits.length && hits[0].object !== connectSource){
+          linkTwoCubes(connectSource, hits[0].object);
+          await db.collection('cubes').doc(hits[0].object.userData.docId).update({ parentId: connectSource.userData.docId });
+        }
+        connectMode=false; if (targetGlow){ scene.remove(targetGlow); targetGlow=null; }
+        return;
+      }
+
+      if (hits.length){
+        selectedParent = hits[0].object;
+        if (glowHelper) scene.remove(glowHelper);
+        glowHelper = createGlow(selectedParent); scene.add(glowHelper);
+        // 选中时标签渐入
+        selectedLabel.cube = selectedParent; selectedLabel.dir = +1; selectedLabel.t0 = performance.now();
+      }else{
+        selectedParent = null;
+        if (glowHelper){ scene.remove(glowHelper); glowHelper=null; }
+        selectedLabel.dir = -1; selectedLabel.t0 = performance.now();
+      }
+    });
+
+    // 打开资料卡（桌面双击 + 触屏双击）
+    function openProfileAtPointer(clientX, clientY){
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const h = raycaster.intersectObjects(cubes);
+      if (!h.length) return;
+      lastProfileCube = h[0].object;
+      showModal(profileCard);
+      nameEl.textContent       = lastProfileCube.userData.name || '';
+      phraseEl.textContent     = lastProfileCube.userData.phrase || '';
+      keywordsEl.textContent   = (lastProfileCube.userData.keywords || []).join(', ');
+      keywordsEl.style.display = lastProfileCube.userData.keywords?.length ? 'block' : 'none';
+      descEl.textContent       = lastProfileCube.userData.desc || '';
+      descEl.style.display     = lastProfileCube.userData.desc ? 'block' : 'none';
+      deleteBtn.style.display  = lastProfileCube.userData.createdBy === currentUid ? 'block' : 'none';
+      showModal(profileCard); 
+    }
+    renderer.domElement.addEventListener('dblclick', (e)=>{ e.stopPropagation(); openProfileAtPointer(e.clientX, e.clientY); });
+
+    // 触屏 double-tap
+    let _tapLastTime=0,_tapDownTime=0; let _tapStart={x:0,y:0};
+    const TAP_MAX_DIST=10, TAP_MAX_TIME=250, DOUBLE_TAP_GAP=280;
+    renderer.domElement.addEventListener('pointerdown',(e)=>{
+      if (e.pointerType!=='touch') return;
+      renderer.domElement.setPointerCapture?.(e.pointerId);
+      _tapStart={x:e.clientX,y:e.clientY}; _tapDownTime=performance.now();
+    },{passive:false});
+    renderer.domElement.addEventListener('pointerup',(e)=>{
+      if (e.pointerType!=='touch') return;
+      const up=performance.now(), dt=up-_tapDownTime;
+      const dx=Math.abs(e.clientX-_tapStart.x), dy=Math.abs(e.clientY-_tapStart.y);
+      if (dt<=TAP_MAX_TIME && dx<=TAP_MAX_DIST && dy<=TAP_MAX_DIST){
+        if (up-_tapLastTime<=DOUBLE_TAP_GAP){ _tapLastTime=0; openProfileAtPointer(e.clientX,e.clientY); }
+        else {
+          _tapLastTime=up;
+          mouse.x=(e.clientX/window.innerWidth)*2-1; mouse.y=-(e.clientY/window.innerHeight)*2+1;
+          raycaster.setFromCamera(mouse,camera);
+          const hits = raycaster.intersectObjects(cubes);
+          if (hits.length){
+            selectedParent = hits[0].object;
+            if (glowHelper) scene.remove(glowHelper);
+            glowHelper = createGlow(selectedParent); scene.add(glowHelper);
+          }
+        }
+      }
+    },{passive:false});
+
+    // 连接 & 删除
+    connectBtn.addEventListener('click', e=>{ e.stopPropagation(); hideModal(profileCard); connectMode = true; connectSource = lastProfileCube; });
+    deleteBtn.addEventListener('click', async e=>{
+      e.stopPropagation();
+      await db.collection('cubes').doc(lastProfileCube.userData.docId).delete();
+      scene.remove(lastProfileCube); hideModal(profileCard);
+    });
     overlay.addEventListener('click', () => {
       hideModal(messageBox);
       hideModal(profileCard);
+      hideModal(uploadModal);
     });
 
-    // 星空效果
-    function addStars() {
-      const cnt = 1000;
-      const geo = new THREE.BufferGeometry();
-      const posArr = new Float32Array(cnt * 3);
-      const phArr  = new Float32Array(cnt);
-      for (let i = 0; i < cnt; i++) {
-        posArr[i*3]   = (Math.random() - 0.5) * 200;
-        posArr[i*3+1] = (Math.random() - 0.5) * 200;
-        posArr[i*3+2] = (Math.random() - 0.5) * 200;
-        phArr[i] = Math.random() * Math.PI * 2;
-      }
-      geo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-      geo.setAttribute('phase',    new THREE.BufferAttribute(phArr, 1));
-      const mat = new THREE.ShaderMaterial({
-        uniforms: {
-          time: { value: 0 },
-          color:{ value: new THREE.Color(0xffffff) },
-          size: { value: 0.25 }
-        },
-        vertexShader: `
-          attribute float phase;
-          uniform float time;
-          uniform float size;
-          varying float vOpacity;
-          void main() {
-            float f = sin(time + phase) * 0.5 + 0.5;
-            vOpacity = f;
-            vec4 mv = modelViewMatrix * vec4(position, 1.0);
-            gl_PointSize = size * (300.0 / -mv.z) * (0.5 + f);
-            gl_Position = projectionMatrix * mv;
-          }
-        `,
-        fragmentShader: `
-          uniform vec3 color;
-          varying float vOpacity;
-          void main() {
-            gl_FragColor = vec4(color, vOpacity);
-          }
-        `,
+    // 表单
+    plusBtn.addEventListener('pointerup', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (!selectedParent) { showModal(messageBox); return; }
+      showModal(uploadModal);               // ★ 不再使用 uploadModal.style.display='block'
+    }, { passive:false });
 
-        fragmentShader: `uniform vec3 color; varying float vOpacity;
-          void main() {
-            gl_FragColor = vec4(color, vOpacity);
-          }`,
-        transparent: true
+    // 关闭创建表单
+    cancelBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hideModal(uploadModal);               // ★ 不再使用 'none'
+      uploadForm.reset();
+    });
+    uploadForm.addEventListener('submit', async e=>{
+      e.preventDefault(); e.stopPropagation();
+      const nameVal = document.getElementById('name').value.trim();
+      const phraseVal = document.getElementById('phrase').value.trim();
+      const kws = [kw1.value.trim(), kw2.value.trim(), kw3.value.trim()].filter(Boolean);
+      const descVal = document.getElementById('desc').value.trim();
+      let pos, attempts=0;
+      do{
+        pos = selectedParent.position.clone().add(new THREE.Vector3((Math.random()-0.5)*20,(Math.random()-0.5)*20,(Math.random()-0.5)*20));
+        attempts++; if (attempts>100) break;
+      }while(isOverlapping(pos));
+
+      const docRef = await db.collection('cubes').add({
+        name:nameVal, phrase:phraseVal, keywords:kws, desc:descVal,
+        createdBy: currentUid, parentId:selectedParent.userData.docId,
+        pos:{x:pos.x,y:pos.y,z:pos.z},
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      const stars = new THREE.Points(geo, mat);
-      scene.add(stars);
-      return mat;
+
+      const newCube = createCubeWithData({ name:nameVal, phrase:phraseVal, keywords:kws, desc:descVal, docId:docRef.id, createdBy:currentUid }, pos);
+      selectedParent = newCube;
+      if (glowHelper) scene.remove(glowHelper);
+      glowHelper = createGlow(newCube); scene.add(glowHelper);
+
+      hideModal(uploadModal);               // ★
+      uploadForm.reset();
+
+    });
+
+    // 随机脉冲（仅对“可见 & 非默认 & 非搜索中”的 cube）
+    function startPulse(cube){
+      if (!cube || !cube.visible || cube.userData.isDefault) return;
+      if ((searchBox.value || '').trim()) return;
+      const glow = makeGlowFor(cube, 0);
+      pulses.push({ cube, glow, t0: performance.now(), durIn:900, hold:300, durOut:900, done:false });
     }
+    setInterval(()=>{
+      if (!cubes.length) return;
+      if (pulses.filter(p=>!p.done).length>=2) return;
+      const candidates = cubes.filter(c => c.visible && !c.userData.isDefault && c !== hoveredCube);
+      if (!candidates.length) return;
+      startPulse(candidates[Math.floor(Math.random()*candidates.length)]);
+    }, 2200);
 
-    const starMat = addStars();
-
-    function animate() {
+    // 动画循环：统一绘制多标签
+    const selectedLabel = { cube:null, alpha:0, dir:0, t0:0, dur:300 };
+    function animate(){
       requestAnimationFrame(animate);
+      const now=performance.now();
       controls.update();
-      starMat.uniforms.time.value = performance.now() / 1000;
+      starMat.uniforms.time.value = now/1000;
+
+      // 更新脉冲
+      for (let i=pulses.length-1;i>=0;i--){
+        const p=pulses[i]; if (p.done) continue;
+        if (!p.cube.visible || (searchBox.value||'').trim()){ scene.remove(p.glow); pulses.splice(i,1); continue; }
+        const t=now-p.t0;
+        let a=0;
+        if (t<p.durIn) a=t/p.durIn;
+        else if (t<p.durIn+p.hold) a=1;
+        else if (t<p.durIn+p.hold+p.durOut) a=1-(t-p.durIn-p.hold)/p.durOut;
+        else { a=0; p.done=true; scene.remove(p.glow); pulses.splice(i,1); continue; }
+        p.glow.material.opacity = a;
+      }
+
+      // 选中标签淡入淡出
+      if (selectedLabel.cube){
+        const dt = now - selectedLabel.t0;
+        const k  = Math.min(1, dt/selectedLabel.dur);
+        selectedLabel.alpha = (selectedLabel.dir>0)? k : (1-k);
+        if (k>=1 && selectedLabel.dir<0){ selectedLabel.alpha=0; selectedLabel.cube=null; }
+      }
+
+      // 本帧活跃标签
+      const active = new Set();
+      if (hoveredCube){ setLabel(hoveredCube, 1); active.add(hoveredCube.userData.docId || hoveredCube.uuid); }
+      if (selectedLabel.cube && selectedLabel.alpha>0){
+        setLabel(selectedLabel.cube, selectedLabel.alpha);
+        active.add(selectedLabel.cube.userData.docId || selectedLabel.cube.uuid);
+      }
+      for (const p of pulses){
+        const a = p.done ? 0 : (p.glow?.material?.opacity || 0);
+        if (a>0){ setLabel(p.cube, a); active.add(p.cube.userData.docId || p.cube.uuid); }
+      }
+      for (const [key, el] of labelMap.entries()){ if (!active.has(key)) el.style.opacity = 0; }
+
       renderer.render(scene, camera);
     }
-
     animate();
 
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', ()=>{
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
